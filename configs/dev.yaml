@@ -3,4 +3,8 @@ coinbase:
   supported_ccy: ['USD', 'GBP', 'EUR']
 
 cache:
-  refresh_time: 3600
+  refresh_time: 1
+
+log:
+  format: "%(asctime)s | %(levelname)s | %(filename)s:%(lineno)s | %(process)d >>> %(message)s"
+  level: 'DEBUG'
