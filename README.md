@@ -35,6 +35,7 @@ poetry install
 #### 3.	Activate the Virtual Environment
 ```
 poetry shell
+export PYTHONPATH=./src
 ```
 
 #### 4.	Run the Application
