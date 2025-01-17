@@ -1,0 +1,6 @@
+coinbase:
+  pricing_url: "https://api.coindesk.com/v1/bpi/currentprice.json"
+  supported_ccy: ['USD', 'GBP', 'EUR']
+
+cache:
+  refresh_time: 3600
