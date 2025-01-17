@@ -57,7 +57,7 @@ poetry run pytest -v
 #### 7. Build docker image
 Docker image for development environment
 ```
-docker build -t fx_convert_dev -f dockers/Dockerfile .
+docker build -t fx_convert_dev -f dockers/Dockerfile-dev .
 ```
 
 Docker image for production environment
