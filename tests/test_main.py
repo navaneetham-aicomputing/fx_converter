@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
-from src.main import app, get_from_coinbase
+from main import app, get_from_coinbase
 from httpx import AsyncClient
 from httpx import MockTransport, Response
 
@@ -19,7 +19,7 @@ MOCK_FX_RATES = {
 
 @pytest.fixture
 def mock_fx_rates():
-    with patch("src.main.get_from_coinbase", return_value=MOCK_FX_RATES):
+    with patch("main.get_from_coinbase", return_value=MOCK_FX_RATES):
         yield
 
 
@@ -32,6 +32,18 @@ async def test_convert_currency_valid(mock_fx_rates):
 
 
 @pytest.mark.asyncio
+async def test_convert_currency_invalid_quantity(mock_fx_rates):
+    await client.app.cache.reset()
+    response = client.get("/v1/convert?ccy_from=USD&ccy_to=GBP&quantity=0")
+    assert response.status_code == 400
+    assert response.json().get('detail') == 'Quantity must be positive value, but given value is: 0.0'
+
+    response = client.get("/v1/convert?ccy_from=USD&ccy_to=GBP&quantity=-1.0")
+    assert response.status_code == 400
+    assert response.json().get('detail') == 'Quantity must be positive value, but given value is: -1.0'
+
+
+@pytest.mark.asyncio
 async def test_convert_currency_same_currency(mock_fx_rates):
     await client.app.cache.reset()
     response = client.get("/v1/convert?ccy_from=USD&ccy_to=USD&quantity=1000")
@@ -40,11 +52,19 @@ async def test_convert_currency_same_currency(mock_fx_rates):
 
 
 @pytest.mark.asyncio
+async def test_convert_currency_lowercase_same_currency(mock_fx_rates):
+    await client.app.cache.reset()
+    response = client.get("/v1/convert?ccy_from=GBP&ccy_to=Gbp&quantity=1000")
+    assert response.status_code == 200
+    assert response.json() == {"quantity": 1000.0, "ccy": "GBP"}
+
+
+@pytest.mark.asyncio
 async def test_convert_currency_invalid_currency_pair(mock_fx_rates):
     await client.app.cache.reset()
     response = client.get("/v1/convert?ccy_from=USD&ccy_to=JPY&quantity=1000")
     assert response.status_code == 400
-    assert response.json() == {"detail": 'Either ccy_from USD or ccy_to JPY is not supported or invalid'}
+    assert response.json().get('detail') == 'Either ccy_from USD or ccy_to JPY is not supported or invalid'
 
 
 @pytest.mark.asyncio

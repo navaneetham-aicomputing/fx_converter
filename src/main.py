@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 import httpx
 from config import Settings
 from typing import Dict
+from pydantic import BaseModel
 from cache import LocalCache
 
 logging.basicConfig(format=Settings.log.format)
@@ -11,7 +12,7 @@ logging.root.setLevel(Settings.log.level)
 
 
 app = FastAPI(title="Currency Converter", description="Convert currencies using CoinDesk FX rates", version="1.0.0")
-app.cache = LocalCache(expire_time=Settings.cache.refresh_time)
+app.cache = LocalCache(refresh_time=Settings.cache.refresh_time)
 
 
 async def get_from_coinbase() -> Dict[str, float]:
@@ -38,16 +39,26 @@ async def get_from_coinbase() -> Dict[str, float]:
     return fx_rate
 
 
+def validate_ccy_convert_data(ccy_from: str, ccy_to: str, quantity: float):
+    if ccy_to not in Settings.coinbase.supported_ccy or ccy_from not in Settings.coinbase.supported_ccy:
+        msg = f'Either ccy_from {ccy_from} or ccy_to {ccy_to} is not supported or invalid'
+        logging.error(msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+    if quantity <= 0:
+        msg = f'Quantity must be positive value, but given value is: {quantity}'
+        logging.error(msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+
+
 @app.get('/v1/convert', summary='Currency Converter')
 async def ccy_convert(ccy_from: str, ccy_to: str, quantity: float):
     # Make sure api able to work even if currency is inputted in non-upper case
     ccy_from = ccy_from.upper()
     ccy_to = ccy_to.upper()
 
-    if ccy_to not in Settings.coinbase.supported_ccy or ccy_from not in Settings.coinbase.supported_ccy:
-        msg = f'Either ccy_from {ccy_from} or ccy_to {ccy_to} is not supported or invalid'
-        logging.error(msg)
-        raise HTTPException(status_code=400, detail=msg)
+    validate_ccy_convert_data(ccy_from, ccy_to, quantity)
 
     if ccy_to == ccy_from:
         return {"quantity": quantity, "ccy": ccy_to}

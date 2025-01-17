@@ -10,9 +10,28 @@ logging.root.setLevel(Settings.log.level)
 
 
 class CacheBase(ABC):
-    def __init__(self, expire_time=3600):
+    """
+    Abstract base class for implementing caching mechanisms with cache refresh.
+
+    Methods:
+        reset():
+            Resets the cache by clearing the last cache timestamp, forcing a refresh on the next `get` call.
+
+        get(refresh_fn: OnAction) -> Any:
+            Retrieves data from the cache. If the cache is expired or uninitialized, calls the provided refresh
+            function to fetch new data and update the cache.
+
+    Usage:
+        - Subclasses should implement `_set_cache` and `_get_cache` to define how the cache is stored and retrieved.
+        - Use the `get` method to safely access or refresh cached data.
+
+    Notes:
+        - The `refresh_time` parameter allows customization of the cache expiration duration.
+        - Concurrency is handled using an asyncio lock to prevent race conditions during cache updates.
+    """
+    def __init__(self, refresh_time=3600):
         self._lock = asyncio.Lock()
-        self._expire_time = expire_time
+        self._refresh_time = refresh_time
         self._cache = None
         self._last_cache_timestamp = None
 
@@ -23,7 +42,7 @@ class CacheBase(ABC):
 
         async with self._lock:
             if not self._last_cache_timestamp or \
-                    asyncio.get_event_loop().time() - self._last_cache_timestamp > self._expire_time:
+                    asyncio.get_event_loop().time() - self._last_cache_timestamp > self._refresh_time:
                 logging.debug('Cache refresh time expired, so call cache refresher function and reset the cache')
                 self._last_cache_timestamp = asyncio.get_event_loop().time()
                 await self._set_cache(await refresh_fn())
@@ -42,6 +61,19 @@ class CacheBase(ABC):
 
 
 class LocalCache(CacheBase):
+    """
+    A local in-memory cache implementation for storing data within a single service instance.
+
+    Methods:
+        _get_cache() -> Any:
+            Retrieves the current cached data. Returns `None` if no data is cached.
+
+        _set_cache(cache: Any):
+            Updates the cached data with the provided value.
+
+    Notes:
+        This cache works with in single process it is not shared across other processes or instances of this service.
+    """
     async def _get_cache(self) -> Any:
         logging.debug(f'LocalCache: get_cache function called. Cached data: {self._cache}')
         return self._cache
@@ -51,8 +83,22 @@ class LocalCache(CacheBase):
         self._cache = cache
 
 
-# Implement Global cache using redis server, which is used between multiple fx conversion services are running
 class RedisCache(CacheBase):
+    """
+    A global cache implementation using a Redis server for shared caching across multiple processes and/or service instances.
+
+    Methods:
+        _get_cache() -> Any:
+            Retrieves the current cached data from the Redis server.
+
+        _set_cache(cache: Any):
+            Updates the cached data on the Redis server with the provided value.
+
+    Notes:
+        TODO: Yet to implement this feature
+        This cache is designed for distributed environments where multiple instances of the
+        FX conversion service are running and need to share a consistent cache.
+    """
     async def _get_cache(self) -> Any:
         logging.debug('RedisCache::_get_cache function called')
         return self._cache
@@ -69,7 +115,7 @@ async def main():
     async def increment(value=0):
         return value+1
 
-    cache = LocalCache(expire_time=1)
+    cache = LocalCache(refresh_time=1)
     assert (await cache.get(partial(increment, 1)) == 2)
     assert (await cache.get(partial(increment, 2)) == 2)
     sleep(1)
