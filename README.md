@@ -54,3 +54,24 @@ curl "http://127.0.0.1:8000/v1/convert?ccy_from=USD&ccy_to=EUR&quantity=100"
 poetry run pytest -v
 ```
 
+#### 7. Build docker image
+Docker image for development environment
+```
+docker build -t fx_convert_dev -f dockers/Dockerfile .
+```
+
+Docker image for production environment
+```
+docker build -t fx_convert_prod -f dockers/Dockerfile .
+```
+
+#### 8. Run docker image
+Run docker for development environment
+```
+docker run -d -p 8000:8000 fx_convert_dev
+```
+
+Run docker for production environment
+```
+docker run -d -p 80:80 fx_convert_prod
+```
