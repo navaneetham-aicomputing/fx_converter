@@ -6,6 +6,9 @@ from config import Settings
 from typing import Dict
 from pydantic import BaseModel
 from cache import LocalCache
+from aiomultiprocess import Pool
+#from multiprocessing import Pool
+from simulation import fx_adjustment
 
 logging.basicConfig(format=Settings.log.format)
 logging.root.setLevel(Settings.log.level)
@@ -13,6 +16,32 @@ logging.root.setLevel(Settings.log.level)
 
 app = FastAPI(title="Currency Converter", description="Convert currencies using CoinDesk FX rates", version="1.0.0")
 app.cache = LocalCache(refresh_time=Settings.cache.refresh_time)
+
+
+async def adjust_fx(fx_rates: dict) -> Dict[str, float]:
+    async with Pool() as pool:
+        try:
+            logging.info('Try adjust fx rate')
+            fx_rates = await pool.map(fx_adjustment, list(fx_rates.items()))
+            fx_rates = dict(fx_rates)
+            logging.info(f'fx rate adjustment success. Adjusted value: {fx_rates}')
+        except Exception as e:
+            logging.error('Error while ding the adjustment', e)
+            raise e
+    '''
+    with Pool() as pool:
+        try:
+            logging.info('Try adjust fx rate')
+            fx_rates = pool.map(fx_adjustment, list(fx_rates.items()))
+            fx_rates = dict(fx_rates)
+            logging.info(f'fx rate adjustment success. Adjusted value: {fx_rates}')
+        except Exception as e:
+            logging.error('Error while ding the adjustment', e)
+            raise e
+    '''
+
+
+    return fx_rates
 
 
 async def get_from_coinbase() -> Dict[str, float]:
@@ -36,7 +65,10 @@ async def get_from_coinbase() -> Dict[str, float]:
                   f'Further info, ccy1: {bpi.get(ccy1)} ccy2: {bpi.get(ccy2)}'
             logging.error(msg)
             raise HTTPException(status_code=404, detail=msg)
-    return fx_rate
+
+    ad_fx_rate: Dict[str, float] = await adjust_fx(fx_rate)
+
+    return ad_fx_rate
 
 
 def validate_ccy_convert_data(ccy_from: str, ccy_to: str, quantity: float):
@@ -49,7 +81,6 @@ def validate_ccy_convert_data(ccy_from: str, ccy_to: str, quantity: float):
         msg = f'Quantity must be positive value, but given value is: {quantity}'
         logging.error(msg)
         raise HTTPException(status_code=400, detail=msg)
-
 
 
 @app.get('/v1/convert', summary='Currency Converter')

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
-from main import app, get_from_coinbase
+from main import app, get_from_coinbase, adjust_fx
 from httpx import AsyncClient
 from httpx import MockTransport, Response
 
@@ -67,6 +67,10 @@ async def test_convert_currency_invalid_currency_pair(mock_fx_rates):
     assert response.json().get('detail') == 'Either ccy_from USD or ccy_to JPY is not supported or invalid'
 
 
+async def mock_fx_adjust(symbol_fx_rate, no_sim=1_000_000):
+    return symbol_fx_rate
+
+
 @pytest.mark.asyncio
 async def test_get_from_coinbase_success():
     mock_response_data = {
@@ -79,10 +83,12 @@ async def test_get_from_coinbase_success():
 
     mock_handler = lambda req: Response(200, json=mock_response_data)
 
+
     transport = MockTransport(mock_handler)
 
     with patch("main.httpx.AsyncClient", lambda: AsyncClient(transport=transport)), \
-            patch("main.Settings.coinbase.pricing_url", mock_pricing_url):
+            patch("main.Settings.coinbase.pricing_url", mock_pricing_url), \
+            patch("main.fx_adjustment", mock_fx_adjust):
         rates = await get_from_coinbase()
 
         assert rates == {
