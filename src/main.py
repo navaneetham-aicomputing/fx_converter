@@ -4,10 +4,8 @@ from fastapi import FastAPI, HTTPException
 import httpx
 from config import Settings
 from typing import Dict
-from pydantic import BaseModel
 from cache import LocalCache
 from aiomultiprocess import Pool
-#from multiprocessing import Pool
 from simulation import fx_adjustment
 
 logging.basicConfig(format=Settings.log.format)
@@ -28,18 +26,6 @@ async def adjust_fx(fx_rates: dict) -> Dict[str, float]:
         except Exception as e:
             logging.error('Error while ding the adjustment', e)
             raise e
-    '''
-    with Pool() as pool:
-        try:
-            logging.info('Try adjust fx rate')
-            fx_rates = pool.map(fx_adjustment, list(fx_rates.items()))
-            fx_rates = dict(fx_rates)
-            logging.info(f'fx rate adjustment success. Adjusted value: {fx_rates}')
-        except Exception as e:
-            logging.error('Error while ding the adjustment', e)
-            raise e
-    '''
-
 
     return fx_rates
 
